@@ -3,7 +3,8 @@ import {
   FileText, Upload, Send, Settings, 
   User, Bot, Plus, Trash2, ShieldAlert, FilePlus, 
   Stethoscope, Activity, FileDigit, AlertCircle, Loader2,
-  ChevronLeft, ChevronRight, Share2, Download, CheckCircle2, X, FileEdit
+  ChevronLeft, ChevronRight, Share2, Download, CheckCircle2, X, FileEdit,
+  Menu, MessageSquare, ChevronLeftSquare, ChevronRightSquare
 } from 'lucide-react';
 
 // Bypasses browser iframe restrictions by rendering PDF directly to a canvas
@@ -161,6 +162,29 @@ export default function App() {
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState('');
 
+  // Responsive Layout / Toggle Control States
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [chatOpen, setChatOpen] = useState(true);
+
+  // Auto collapse panels on smaller viewports on startup
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+      }
+      if (window.innerWidth < 1280) {
+        setChatOpen(false);
+      } else {
+        setChatOpen(true);
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Share Modal State
   const [showShareModal, setShowShareModal] = useState(false);
   const [docName, setDocName] = useState('');
@@ -184,6 +208,7 @@ export default function App() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Utility to parse markdown bold elements recursively inside lists or blocks
   const parseInlineMarkdown = (text) => {
     if (!text) return '';
     const parts = text.split(/(\*\*.*?\*\*)/g);
@@ -426,7 +451,7 @@ export default function App() {
   const activeDoc = documents.find(d => d.id === activeDocId);
 
   return (
-    <div className="flex h-screen w-full bg-slate-50 text-slate-800 font-sans overflow-hidden relative">
+    <div className="flex h-screen w-screen max-w-none bg-slate-50 text-slate-800 font-sans overflow-hidden fixed inset-0 m-0 p-0 z-50 animate-fade-in select-none">
       
       {/* SECURE DOCTOR DISPATCH MODAL */}
       {showShareModal && (
@@ -527,15 +552,18 @@ export default function App() {
         </div>
       )}
 
-      {/* LEFT PANEL: Sources & Setup */}
-      <div className="w-80 bg-white border-r border-slate-200 flex flex-col shadow-sm z-10 flex-shrink-0">
-        <div className="p-4 border-b border-slate-100 bg-teal-50/50 flex items-center gap-3">
-          <div className="bg-teal-600 text-white p-2 rounded-lg">
-            <Stethoscope size={24} />
+      {/* LEFT PANEL: Sources & Key Setup */}
+      <div className={`fixed inset-y-0 left-0 lg:static z-40 w-80 bg-white border-r border-slate-200 flex flex-col shadow-sm transition-transform duration-300 transform shrink-0 ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:hidden'
+      }`}>
+        {/* Brand Header block - Optimized to prevent distortion and overly large layouts on desktop */}
+        <div className="p-3.5 border-b border-slate-100 bg-teal-50/40 flex items-center gap-2.5 shrink-0 min-w-0 w-full overflow-hidden">
+          <div className="bg-teal-600 text-white p-2 rounded-lg shrink-0 flex items-center justify-center shadow-sm">
+            <Stethoscope size={18} className="shrink-0" />
           </div>
-          <div>
-            <h1 className="font-bold text-lg text-slate-900 leading-tight">HealthNotes AI</h1>
-            <p className="text-xs text-teal-700 font-medium">Clinical Document Intelligence</p>
+          <div className="min-w-0 flex-1">
+            <h2 className="font-bold text-sm text-slate-900 tracking-tight truncate leading-none">HealthNotes AI</h2>
+            <p className="text-[10px] text-teal-700 font-semibold truncate leading-none mt-1">Clinical Document Intelligence</p>
           </div>
         </div>
 
@@ -582,7 +610,7 @@ export default function App() {
               </span>
             </div>
 
-            {/* Upload Buttons */}
+            {/* Direct Upload Panel */}
             <div className="w-full">
               <button 
                 onClick={() => fileInputRef.current?.click()}
@@ -591,7 +619,7 @@ export default function App() {
                 <div className="p-2 bg-slate-50 group-hover:bg-teal-100/50 text-slate-400 group-hover:text-teal-600 rounded-lg transition-colors">
                   <Upload size={20} />
                 </div>
-                <span className="text-xs font-semibold text-slate-700 group-hover:text-teal-700">Upload PDF Medical Document</span>
+                <span className="text-xs font-semibold text-slate-700 group-hover:text-teal-700 text-center leading-tight">Upload PDF Medical Document</span>
                 <span className="text-[10px] text-slate-400">PDF, TXT, or Image</span>
               </button>
             </div>
@@ -616,21 +644,18 @@ export default function App() {
                 documents.map(doc => (
                   <div 
                     key={doc.id}
-                    onClick={() => {
-                      setActiveDocId(doc.id);
-                      setActiveTab('viewer'); // Always reset tab on document switch
-                    }}
+                    onClick={() => setActiveDocId(doc.id)}
                     className={`group flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
                       activeDocId === doc.id 
                         ? 'border-teal-500 bg-teal-50 shadow-sm' 
                         : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                     }`}
                   >
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <div className={`p-1.5 rounded-lg ${activeDocId === doc.id ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-500'}`}>
+                    <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1">
+                      <div className={`p-1.5 rounded-lg shrink-0 ${activeDocId === doc.id ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-500'}`}>
                         {doc.type === 'pdf' ? <FileText size={16} /> : <FileDigit size={16} />}
                       </div>
-                      <div className="flex flex-col truncate">
+                      <div className="flex flex-col min-w-0 flex-1">
                         <span className={`text-sm font-medium truncate ${activeDocId === doc.id ? 'text-teal-900' : 'text-slate-700'}`}>
                           {doc.name}
                         </span>
@@ -639,7 +664,7 @@ export default function App() {
                     </div>
                     <button 
                       onClick={(e) => removeDocument(doc.id, e)}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all shrink-0 ml-1"
                       title="Remove document"
                     >
                       <Trash2 size={14} />
@@ -653,21 +678,40 @@ export default function App() {
       </div>
 
       {/* CENTER PANEL: Document Viewer & Summary Suite */}
-      <div className="flex-1 bg-slate-200/50 flex flex-col p-4 relative">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 bg-slate-100 flex flex-col relative min-w-0">
+        <div className="bg-white flex-1 flex flex-col overflow-hidden">
           
           {/* Header & Tabs */}
-          <div className="border-b border-slate-150 bg-slate-50 flex flex-col shrink-0">
-            <div className="h-12 flex items-center px-4 justify-between">
-              <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <Activity size={16} className="text-teal-600" />
-                Medical Workspace
-              </h3>
+          <div className="border-b border-slate-150 bg-slate-50 flex flex-col shrink-0 z-20 shadow-xs">
+            <div className="h-12 flex items-center px-4 justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {/* Collapsible Panel Toggles for smaller screen sizes & laptop optimizations */}
+                <button 
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200/60 transition-colors mr-1"
+                  title="Toggle sidebar sources"
+                >
+                  <Menu size={18} />
+                </button>
+                <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 truncate">
+                  <Activity size={16} className="text-teal-600 shrink-0" />
+                  <span className="hidden sm:inline">Medical Workspace</span>
+                </h3>
+              </div>
+              
               {activeDoc && (
-                <span className="text-xs text-slate-500 font-medium bg-white px-2.5 py-1 rounded-md border border-slate-200 shadow-sm max-w-[240px] truncate" title={activeDoc.name}>
+                <span className="text-xs text-slate-600 font-medium bg-white px-2.5 py-1 rounded-md border border-slate-200 shadow-xs max-w-[160px] md:max-w-[280px] truncate" title={activeDoc.name}>
                   {activeDoc.name}
                 </span>
               )}
+
+              <button 
+                onClick={() => setChatOpen(!chatOpen)}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200/60 transition-colors ml-auto"
+                title="Toggle health assistant chatbot"
+              >
+                <MessageSquare size={18} />
+              </button>
             </div>
 
             {/* TAB CONTAINER */}
@@ -705,7 +749,7 @@ export default function App() {
                   <FileText size={32} className="text-slate-300" />
                 </div>
                 <h3 className="text-lg font-semibold text-slate-700 mb-2">No Document Selected</h3>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-slate-500 leading-relaxed">
                   Upload a medical report, blood test, or prescription from the left panel to view and summarize it here.
                 </p>
               </div>
@@ -722,10 +766,10 @@ export default function App() {
               )
             ) : (
               // CLINICAL SUMMARY VIEW
-              <div className="w-full h-full bg-slate-100 flex flex-col p-6 overflow-y-auto">
+              <div className="w-full h-full bg-slate-100 flex flex-col p-4 md:p-6 overflow-y-auto">
                 {!summaries[activeDoc.id] ? (
                   // Summary Pending Generation
-                  <div className="m-auto max-w-md bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-center">
+                  <div className="m-auto max-w-md bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm text-center">
                     <div className="bg-teal-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-teal-600">
                       <FileEdit size={28} />
                     </div>
@@ -761,11 +805,11 @@ export default function App() {
                   </div>
                 ) : (
                   // Summary Display Area
-                  <div className="max-w-3xl mx-auto w-full space-y-4 animate-fade-in">
+                  <div className="max-w-3xl mx-auto w-full space-y-4 animate-fade-in pb-12">
                     {/* Action Bar */}
                     <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-sm shrink-0">
                       <div className="flex items-center gap-2 text-teal-700 font-semibold text-xs bg-teal-50 px-2.5 py-1 rounded-md">
-                        <CheckCircle2 size={14} />
+                        <CheckCircle2 size={14} className="shrink-0" />
                         Summary Report Compiled
                       </div>
                       
@@ -775,64 +819,74 @@ export default function App() {
                           className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors"
                         >
                           <Share2 size={14} />
-                          Share with Doctor
+                          <span className="hidden sm:inline">Share with Doctor</span>
                         </button>
                         <button
                           onClick={downloadSummaryPdf}
                           className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
                         >
                           <Download size={14} />
-                          Download PDF
+                          <span className="hidden sm:inline">Download PDF</span>
                         </button>
                       </div>
                     </div>
 
                     {/* PRINT CONTAINER / PRINT TEMPLATE */}
+                    {/* Adjusted text alignment and padding here to look clean and highly professional */}
                     <div 
                       ref={summaryReportRef} 
-                      className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-slate-800 space-y-6 select-text text-sm"
+                      className="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm text-slate-800 space-y-6 select-text text-sm text-left"
                     >
                       {/* Clinical Summary Headers */}
-                      <div className="border-b-2 border-slate-200 pb-4 flex justify-between items-start">
-                        <div>
-                          <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                            <Stethoscope size={22} className="text-teal-600" />
+                      <div className="border-b-2 border-slate-200 pb-4 flex justify-between items-start gap-4">
+                        <div className="min-w-0">
+                          <h3 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2 truncate">
+                            <Stethoscope size={22} className="text-teal-600 shrink-0" />
                             Clinical Summary Report
-                          </h1>
-                          <p className="text-[11px] text-slate-500 font-medium tracking-wide uppercase mt-1">Generated by HealthNotes AI Workspace</p>
+                          </h3>
+                          <p className="text-[10px] md:text-[11px] text-slate-500 font-medium tracking-wide uppercase mt-1">Generated by HealthNotes AI Workspace</p>
                         </div>
-                        <div className="text-right text-xs text-slate-500">
-                          <p><strong className="font-semibold text-slate-700">Source:</strong> {activeDoc.name}</p>
+                        <div className="text-right text-xs text-slate-500 shrink-0">
+                          <p className="truncate max-w-[120px] md:max-w-xs"><strong className="font-semibold text-slate-700">Source:</strong> {activeDoc.name}</p>
                           <p><strong className="font-semibold text-slate-700">File Size:</strong> {activeDoc.size}</p>
                         </div>
                       </div>
 
                       {/* Summary Body parsing markdown */}
                       <div className="prose prose-sm prose-slate max-w-none prose-p:my-2 space-y-4">
+                        {}
                         {summaries[activeDoc.id].split('\n').map((line, i) => {
                           const trimmed = line.trim();
-                          
-                          // Handle major headers from markdown
-                          if (trimmed.startsWith('#') || (trimmed.startsWith('1.') || trimmed.startsWith('2.') || trimmed.startsWith('3.') || trimmed.startsWith('4.'))) {
+                          if (!trimmed) return <div key={i} className="h-2" />;
+
+                          // Check if line contains markdown heading markers (#) or is list numbering
+                          const isMarkdownHeading = trimmed.startsWith('#');
+                          const isNumberedHeading = /^\d+\.\s+\*\*/.test(trimmed) || /^\d+\.\s+[A-Z\s]+/.test(trimmed);
+
+                          if (isMarkdownHeading || isNumberedHeading) {
+                            // Strip raw heading prefixes (e.g. #, ##, ###, ####) and clean double asterisks
+                            const cleanHeader = trimmed.replace(/^#+\s*/, '');
                             return (
-                              <h3 key={i} className="text-sm font-bold text-teal-800 border-b border-teal-50 pb-1 mt-6 tracking-wide uppercase flex items-center gap-2">
-                                {parseInlineMarkdown(trimmed)}
+                              <h3 key={i} className="text-sm font-bold text-teal-800 border-b border-teal-100 pb-1.5 mt-6 tracking-wide uppercase flex items-center gap-2 text-left">
+                                {parseInlineMarkdown(cleanHeader)}
                               </h3>
                             );
                           }
                           
-                          // Handle lists
+                          // Handle standard lists
                           if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+                            const listText = trimmed.replace(/^[\*\-]\s+/, '');
                             return (
-                              <li key={i} className="ml-4 list-disc marker:text-teal-600 text-slate-700">
-                                {parseInlineMarkdown(trimmed.substring(2))}
+                              <li key={i} className="ml-4 list-disc marker:text-teal-600 text-slate-700 text-left my-1.5">
+                                {parseInlineMarkdown(listText)}
                               </li>
                             );
                           }
 
+                          // Default paragraphs left-aligned
                           return (
-                            <p key={i} className="text-slate-700 leading-relaxed min-h-[1rem]">
-                              {parseInlineMarkdown(line)}
+                            <p key={i} className="text-slate-700 leading-relaxed text-left my-2">
+                              {parseInlineMarkdown(trimmed)}
                             </p>
                           );
                         })}
@@ -853,25 +907,33 @@ export default function App() {
       </div>
 
       {/* RIGHT PANEL: Chatbot */}
-      <div className="w-[400px] bg-white border-l border-slate-200 flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-10 flex-shrink-0">
+      <div className={`fixed inset-y-0 right-0 xl:static z-40 w-full sm:w-[400px] bg-white border-l border-slate-200 flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] transition-transform duration-300 transform shrink-0 ${
+        chatOpen ? 'translate-x-0' : 'translate-x-full xl:hidden'
+      }`}>
         {/* Chat Header */}
-        <div className="h-16 border-b border-slate-100 flex items-center px-5 bg-white shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="relative">
+        <div className="h-16 border-b border-slate-100 flex items-center px-5 bg-white shrink-0 justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative shrink-0">
               <div className="bg-teal-100 text-teal-600 p-2 rounded-xl">
                 <Bot size={20} />
               </div>
               <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
             </div>
-            <div>
-              <h2 className="font-semibold text-slate-800 leading-tight">Health Assistant</h2>
-              <p className="text-[11px] text-slate-500 font-medium">Powered by Gemini 2.5 Flash</p>
+            <div className="min-w-0">
+              <h2 className="font-semibold text-slate-800 leading-tight truncate">Health Assistant</h2>
+              <p className="text-[11px] text-slate-500 font-medium truncate">Powered by Gemini 2.5 Flash</p>
             </div>
           </div>
+          <button 
+            onClick={() => setChatOpen(false)}
+            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 xl:hidden"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth bg-slate-50/50">
+        <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-6 scroll-smooth bg-slate-50/50">
           {messages.map((msg, idx) => (
             <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               
@@ -885,26 +947,26 @@ export default function App() {
               {/* Message Bubble */}
               <div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm ${
                 msg.role === 'user' 
-                  ? 'bg-teal-600 text-white rounded-tr-sm' 
+                  ? 'bg-teal-600 text-white rounded-tr-xs' 
                   : msg.role === 'error'
-                    ? 'bg-red-50 border border-red-100 text-red-800 rounded-tl-sm'
-                    : 'bg-white border border-slate-200 text-slate-700 rounded-tl-sm leading-relaxed'
+                    ? 'bg-red-50 border border-red-100 text-red-800 rounded-tl-xs'
+                    : 'bg-white border border-slate-200 text-slate-700 rounded-tl-xs leading-relaxed'
               }`}>
                 {msg.role === 'model' ? (
-                  <div className="prose prose-sm prose-slate max-w-none prose-p:my-1 prose-headings:mb-2 prose-headings:mt-4 prose-li:my-0.5">
+                  <div className="prose prose-sm prose-slate max-w-none prose-p:my-1 prose-headings:mb-2 prose-headings:mt-4 prose-li:my-0.5 text-left">
                     {msg.text.split('\n').map((line, i) => {
                       if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
-                        return <li key={i} className="ml-4 list-disc marker:text-teal-500">{parseInlineMarkdown(line.substring(2))}</li>;
+                        return <li key={i} className="ml-4 list-disc marker:text-teal-500 text-left">{parseInlineMarkdown(line.substring(2))}</li>;
                       }
                       return (
-                        <p key={i} className="min-h-[1rem]">
+                        <p key={i} className="min-h-[1rem] text-left">
                           {parseInlineMarkdown(line)}
                         </p>
                       );
                     })}
                   </div>
                 ) : (
-                  <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                  <p className="text-sm whitespace-pre-wrap text-left">{msg.text}</p>
                 )}
               </div>
 
@@ -924,7 +986,7 @@ export default function App() {
               <div className="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0 mt-1 shadow-sm">
                 <Bot size={16} />
               </div>
-              <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm flex items-center gap-2">
+              <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-xs px-5 py-4 shadow-sm flex items-center gap-2">
                 <Loader2 size={16} className="text-teal-500 animate-spin" />
                 <span className="text-sm text-slate-500 font-medium">Thinking...</span>
               </div>
@@ -934,7 +996,7 @@ export default function App() {
         </div>
 
         {/* Chat Input */}
-        <div className="p-4 bg-white border-t border-slate-100">
+        <div className="p-4 bg-white border-t border-slate-100 shrink-0">
           <form onSubmit={handleSendMessage} className="relative flex items-center">
             <input
               type="text"
@@ -947,13 +1009,13 @@ export default function App() {
             <button
               type="submit"
               disabled={!inputValue.trim() || isLoading}
-              className="absolute right-2 p-2 bg-teal-600 text-white rounded-full hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
+              className="absolute right-2 p-2 bg-teal-600 text-white rounded-full hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 animate-fade-in"
             >
               <Send size={16} className="ml-0.5" />
             </button>
           </form>
           <div className="text-center mt-2">
-            <span className="text-[10px] text-slate-400">
+            <span className="text-[10px] text-slate-400 leading-tight block">
               AI can make mistakes. Always consult a certified healthcare professional.
             </span>
           </div>
