@@ -4,7 +4,7 @@ import {
   User, Bot, Plus, Trash2, ShieldAlert, FilePlus, 
   Stethoscope, Activity, FileDigit, AlertCircle, Loader2,
   ChevronLeft, ChevronRight, Share2, Download, CheckCircle2, X, FileEdit,
-  Menu, MessageSquare, ChevronLeftSquare, ChevronRightSquare
+  Menu, MessageSquare
 } from 'lucide-react';
 
 // Bypasses browser iframe restrictions by rendering PDF directly to a canvas
@@ -73,8 +73,6 @@ const CustomPDFViewer = ({ dataUri }) => {
       
       try {
         const currentPage = await pdf.getPage(page);
-        
-        // Render at a higher scale for better text clarity
         const viewport = currentPage.getViewport({ scale: 2.0 }); 
         const canvas = canvasRef.current;
         const context = canvas.getContext('2d');
@@ -90,7 +88,6 @@ const CustomPDFViewer = ({ dataUri }) => {
         renderTask = currentPage.render(renderContext);
         await renderTask.promise;
       } catch (err) {
-        // Ignore render cancellation errors
         if (err.name !== 'RenderingCancelledException') {
           console.error("Error rendering page:", err);
         }
@@ -114,7 +111,6 @@ const CustomPDFViewer = ({ dataUri }) => {
 
   return (
     <div className="w-full h-full flex flex-col bg-slate-200/50 overflow-hidden relative">
-      {/* PDF Toolbar */}
       <div className="h-12 bg-white border-b border-slate-200 flex items-center justify-center gap-4 shrink-0 shadow-sm z-10">
         <button 
           onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -135,7 +131,6 @@ const CustomPDFViewer = ({ dataUri }) => {
         </button>
       </div>
       
-      {/* PDF Canvas Container */}
       <div className="flex-1 overflow-auto flex justify-center p-4">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
@@ -153,7 +148,6 @@ const CustomPDFViewer = ({ dataUri }) => {
 };
 
 export default function App() {
-  // Application State
   const [apiKey, setApiKey] = useState('');
   const [documents, setDocuments] = useState([]);
   const [activeDocId, setActiveDocId] = useState(null);
@@ -162,11 +156,11 @@ export default function App() {
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState('');
 
-  // Responsive Layout / Toggle Control States
+  // Responsive Layout panel state controls
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [chatOpen, setChatOpen] = useState(true);
 
-  // Auto collapse panels on smaller viewports on startup
+  // Auto collapse panels on smaller laptop views
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 1024) {
@@ -185,7 +179,7 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Share Modal State
+  // Secure doctor dispatch state control
   const [showShareModal, setShowShareModal] = useState(false);
   const [docName, setDocName] = useState('');
   const [docEmail, setDocEmail] = useState('');
@@ -208,7 +202,45 @@ export default function App() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Utility to parse markdown bold elements recursively inside lists or blocks
+  // Strips off AI greeting prefaces, conversational intros and horizontal markdown lines
+  const sanitizeSummaryText = (text) => {
+    if (!text) return '';
+    const lines = text.split('\n');
+    const cleanedLines = [];
+    let contentStarted = false;
+
+    for (let line of lines) {
+      const trimmed = line.trim();
+      
+      // Skip horizontal lines / markdown separators completely
+      if (/^[*\-_=]{3,}$/.test(trimmed)) {
+        continue;
+      }
+
+      if (!contentStarted) {
+        // Detect if line is an actual header (starts with # or numbers like 1. CLINICAL...)
+        const isHeader = trimmed.startsWith('#') || /^\d+\./.test(trimmed);
+        
+        // Detect if line is a welcome conversational phrase
+        const isPreface = /^(here\s+is|below\s+is|this\s+is|sure|based\s+on|please\s+find|compiled|clinical\s+summary\s+report|as\s+requested|hello|greetings|dear)/i.test(trimmed);
+        
+        if (isHeader) {
+          contentStarted = true;
+        } else if (isPreface || trimmed === '') {
+          // Skip these conversational intros or early line breaks
+          continue;
+        } else {
+          // Any other legitimate descriptive line triggers starting of the report
+          contentStarted = true;
+        }
+      }
+
+      cleanedLines.push(line);
+    }
+
+    return cleanedLines.join('\n').trim();
+  };
+
   const parseInlineMarkdown = (text) => {
     if (!text) return '';
     const parts = text.split(/(\*\*.*?\*\*)/g);
@@ -247,7 +279,7 @@ export default function App() {
           const updated = [...prev, newDoc];
           if (!activeDocId) {
             setActiveDocId(newDoc.id);
-            setActiveTab('viewer'); // Default to document view
+            setActiveTab('viewer');
           }
           return updated;
         });
@@ -267,7 +299,6 @@ export default function App() {
       }
       return prev.filter(d => d.id !== id);
     });
-    // Cleanup generated summary
     setSummaries(prev => {
       const copy = { ...prev };
       delete copy[id];
@@ -294,9 +325,8 @@ export default function App() {
       }));
 
     const currentUserMessage = { role: "user", parts: [{ text: promptText }] };
-    
-    // Attach document contexts
     const docsToAttach = optionalDoc ? [optionalDoc] : documents;
+    
     docsToAttach.forEach(doc => {
       if (doc.data) {
         currentUserMessage.parts.unshift({
@@ -313,9 +343,7 @@ export default function App() {
     const payload = {
       systemInstruction: {
         parts: [{ 
-          text: `You are an expert, compassionate AI healthcare assistant. You have been provided with the patient's medical documents, reports, and prescriptions. 
-          Your job is to analyze these documents to answer the patient's queries accurately. If a query is unrelated to the documents, answer it using your general medical knowledge but add a disclaimer that they should consult a doctor. 
-          Always maintain a professional, reassuring, clinical tone. Do not diagnose conditions if the evidence is insufficient; instead, explain what the reports mean in simple terms.`
+          text: `You are an expert, compassionate AI healthcare assistant. You have been provided with the patient's medical documents, reports, and prescriptions. Your job is to analyze these documents to answer the patient's queries accurately. If a query is unrelated to the documents, answer it using your general medical knowledge but add a disclaimer that they should consult a doctor. Always maintain a professional, reassuring, clinical tone. Do not diagnose conditions if the evidence is insufficient; instead, explain what the reports mean in simple terms.`
         }]
       },
       contents: apiMessages
@@ -365,13 +393,15 @@ export default function App() {
     3. **TREATMENT & PRESCRIPTION DIRECTIVES** (Explicit dosage, schedules, or physician suggestions extracted from the record)
     4. **RECOMMENDED NEXT ACTIONS & DISCLAIMERS** (Practical, actionable clinical suggestions for follow-up care and necessary medical checkup warnings)
     
-    Return the response using clean formatting.`;
+    Return the response using clean formatting. Do not include any prefaces, introduction sentences, or separator dashes at the start.`;
 
     try {
       const summaryText = await callGeminiAPI(summaryPrompt, activeDoc);
+      // Ensure any trailing conversational lines or markdown divider ticks get removed
+      const cleanedSummary = sanitizeSummaryText(summaryText);
       setSummaries(prev => ({
         ...prev,
-        [activeDocId]: summaryText
+        [activeDocId]: cleanedSummary
       }));
     } catch (err) {
       setSummaryError(err.message || "Failed to compile the clinical summary. Please check your network and API key.");
@@ -380,32 +410,67 @@ export default function App() {
     }
   };
 
-  const downloadSummaryPdf = async () => {
-    const activeDoc = documents.find(d => d.id === activeDocId);
-    if (!activeDoc || !summaries[activeDocId]) return;
+  // Generates complete, multi-page vector PDF documents without viewport truncation
+  const downloadSummaryPdf = () => {
+    const reportElement = document.getElementById('summary-print-container');
+    if (!reportElement) return;
 
-    // Dynamically load html2pdf.js CDN if not yet loaded
-    if (!window.html2pdf) {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-      document.body.appendChild(script);
-      await new Promise(resolve => (script.onload = resolve));
-    }
+    // Build off-screen printable iframe sandbox
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
 
-    const element = summaryReportRef.current;
-    const opt = {
-      margin:       [0.5, 0.5, 0.5, 0.5],
-      filename:     `HealthNotes_AI_Summary_${activeDoc.name.replace(/\.[^/.]+$/, "")}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-
-    try {
-      window.html2pdf().set(opt).from(element).save();
-    } catch (err) {
-      console.error("PDF download failed", err);
-    }
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(`
+      <html>
+        <head>
+          <title>Clinical Summary Report</title>
+          <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+          <style>
+            body {
+              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              background: white !important;
+              color: #1e293b !important;
+              padding: 40px;
+            }
+            @media print {
+              body {
+                padding: 0;
+              }
+              @page {
+                margin: 20mm;
+                size: portrait;
+              }
+              /* Prevent breaking sections awkwardly over pages */
+              h3, li, p {
+                page-break-inside: avoid;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="space-y-6">
+            ${reportElement.innerHTML}
+          </div>
+          <script>
+            window.onload = function() {
+              window.focus();
+              window.print();
+              setTimeout(function() {
+                window.parent.document.body.removeChild(window.frameElement);
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    doc.close();
   };
 
   const handleShareSubmit = (e) => {
@@ -415,7 +480,7 @@ export default function App() {
     setIsSharing(true);
     setShareSuccess(false);
 
-    // Simulate clinical dispatch pipeline & end-to-end medical encryption
+    // Simulated medical encryption dispatch loop
     setTimeout(() => {
       setIsSharing(false);
       setShareSuccess(true);
@@ -552,11 +617,10 @@ export default function App() {
         </div>
       )}
 
-      {/* LEFT PANEL: Sources & Key Setup */}
+      {/* LEFT PANEL: Sources & Setup */}
       <div className={`fixed inset-y-0 left-0 lg:static z-40 w-80 bg-white border-r border-slate-200 flex flex-col shadow-sm transition-transform duration-300 transform shrink-0 ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:hidden'
       }`}>
-        {/* Brand Header block - Optimized to prevent distortion and overly large layouts on desktop */}
         <div className="p-3.5 border-b border-slate-100 bg-teal-50/40 flex items-center gap-2.5 shrink-0 min-w-0 w-full overflow-hidden">
           <div className="bg-teal-600 text-white p-2 rounded-lg shrink-0 flex items-center justify-center shadow-sm">
             <Stethoscope size={18} className="shrink-0" />
@@ -568,8 +632,6 @@ export default function App() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
-          
-          {/* API Key Section */}
           <div className="space-y-2">
             <button 
               onClick={() => setShowSettings(!showSettings)}
@@ -601,7 +663,6 @@ export default function App() {
 
           <hr className="border-slate-100" />
 
-          {/* Sources Section */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-600 uppercase tracking-wider">Patient Records</h2>
@@ -610,7 +671,6 @@ export default function App() {
               </span>
             </div>
 
-            {/* Direct Upload Panel */}
             <div className="w-full">
               <button 
                 onClick={() => fileInputRef.current?.click()}
@@ -633,7 +693,6 @@ export default function App() {
               multiple 
             />
 
-            {/* Document List */}
             <div className="space-y-2 mt-4">
               {documents.length === 0 ? (
                 <div className="text-center p-6 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
@@ -677,15 +736,13 @@ export default function App() {
         </div>
       </div>
 
-      {/* CENTER PANEL: Document Viewer & Summary Suite */}
+      {/* CENTER PANEL: Document Workspace & Clinical Report Panel */}
       <div className="flex-1 bg-slate-100 flex flex-col relative min-w-0">
         <div className="bg-white flex-1 flex flex-col overflow-hidden">
           
-          {/* Header & Tabs */}
           <div className="border-b border-slate-150 bg-slate-50 flex flex-col shrink-0 z-20 shadow-xs">
             <div className="h-12 flex items-center px-4 justify-between gap-2">
               <div className="flex items-center gap-2">
-                {/* Collapsible Panel Toggles for smaller screen sizes & laptop optimizations */}
                 <button 
                   onClick={() => setSidebarOpen(!sidebarOpen)}
                   className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200/60 transition-colors mr-1"
@@ -694,7 +751,7 @@ export default function App() {
                   <Menu size={18} />
                 </button>
                 <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 truncate">
-                  <Activity size={16} className="text-teal-600 shrink-0" />
+                  <Activity size={16} className="text-teal-600 animate-pulse" />
                   <span className="hidden sm:inline">Medical Workspace</span>
                 </h3>
               </div>
@@ -714,7 +771,6 @@ export default function App() {
               </button>
             </div>
 
-            {/* TAB CONTAINER */}
             {activeDoc && (
               <div className="flex px-4 border-t border-slate-100 gap-1 bg-slate-50">
                 <button
@@ -741,7 +797,6 @@ export default function App() {
             )}
           </div>
           
-          {/* Viewer Content */}
           <div className="flex-1 bg-slate-100 relative overflow-hidden flex items-center justify-center">
             {!activeDoc ? (
               <div className="text-center max-w-sm p-6">
@@ -754,7 +809,6 @@ export default function App() {
                 </p>
               </div>
             ) : activeTab === 'viewer' ? (
-              // ORIGINAL DOCUMENT VIEW
               activeDoc.type === 'pdf' ? (
                 <CustomPDFViewer dataUri={activeDoc.dataUri} />
               ) : (
@@ -765,10 +819,8 @@ export default function App() {
                 />
               )
             ) : (
-              // CLINICAL SUMMARY VIEW
               <div className="w-full h-full bg-slate-100 flex flex-col p-4 md:p-6 overflow-y-auto">
                 {!summaries[activeDoc.id] ? (
-                  // Summary Pending Generation
                   <div className="m-auto max-w-md bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm text-center">
                     <div className="bg-teal-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-teal-600">
                       <FileEdit size={28} />
@@ -804,9 +856,7 @@ export default function App() {
                     </button>
                   </div>
                 ) : (
-                  // Summary Display Area
                   <div className="max-w-3xl mx-auto w-full space-y-4 animate-fade-in pb-12">
-                    {/* Action Bar */}
                     <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-sm shrink-0">
                       <div className="flex items-center gap-2 text-teal-700 font-semibold text-xs bg-teal-50 px-2.5 py-1 rounded-md">
                         <CheckCircle2 size={14} className="shrink-0" />
@@ -831,15 +881,13 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* PRINT CONTAINER / PRINT TEMPLATE */}
-                    {/* Adjusted text alignment and padding here to look clean and highly professional */}
                     <div 
                       ref={summaryReportRef} 
+                      id="summary-print-container"
                       className="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm text-slate-800 space-y-6 select-text text-sm text-left"
                     >
-                      {/* Clinical Summary Headers */}
                       <div className="border-b-2 border-slate-200 pb-4 flex justify-between items-start gap-4">
-                        <div className="min-w-0">
+                        <div className="min-w-0 font-sans">
                           <h3 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2 truncate">
                             <Stethoscope size={22} className="text-teal-600 shrink-0" />
                             Clinical Summary Report
@@ -852,28 +900,24 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Summary Body parsing markdown */}
-                      <div className="prose prose-sm prose-slate max-w-none prose-p:my-2 space-y-4">
-                        {}
+                      {}
+                      <div className="prose prose-sm prose-slate max-w-none prose-p:my-2 space-y-4 font-sans">
                         {summaries[activeDoc.id].split('\n').map((line, i) => {
                           const trimmed = line.trim();
                           if (!trimmed) return <div key={i} className="h-2" />;
 
-                          // Check if line contains markdown heading markers (#) or is list numbering
                           const isMarkdownHeading = trimmed.startsWith('#');
                           const isNumberedHeading = /^\d+\.\s+\*\*/.test(trimmed) || /^\d+\.\s+[A-Z\s]+/.test(trimmed);
 
                           if (isMarkdownHeading || isNumberedHeading) {
-                            // Strip raw heading prefixes (e.g. #, ##, ###, ####) and clean double asterisks
                             const cleanHeader = trimmed.replace(/^#+\s*/, '');
                             return (
-                              <h3 key={i} className="text-sm font-bold text-teal-800 border-b border-teal-100 pb-1.5 mt-6 tracking-wide uppercase flex items-center gap-2 text-left">
+                              <h3 key={i} className="text-sm font-bold text-teal-800 border-b border-teal-100 pb-1.5 mt-6 tracking-wide uppercase flex items-center gap-2 text-left animate-fade-in">
                                 {parseInlineMarkdown(cleanHeader)}
                               </h3>
                             );
                           }
                           
-                          // Handle standard lists
                           if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
                             const listText = trimmed.replace(/^[\*\-]\s+/, '');
                             return (
@@ -883,9 +927,8 @@ export default function App() {
                             );
                           }
 
-                          // Default paragraphs left-aligned
                           return (
-                            <p key={i} className="text-slate-700 leading-relaxed text-left my-2">
+                            <p key={i} className="text-slate-700 leading-relaxed text-left my-2 font-normal">
                               {parseInlineMarkdown(trimmed)}
                             </p>
                           );
@@ -906,11 +949,10 @@ export default function App() {
         </div>
       </div>
 
-      {/* RIGHT PANEL: Chatbot */}
+      {/* RIGHT PANEL: Clinical Assistant Chatbot */}
       <div className={`fixed inset-y-0 right-0 xl:static z-40 w-full sm:w-[400px] bg-white border-l border-slate-200 flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] transition-transform duration-300 transform shrink-0 ${
         chatOpen ? 'translate-x-0' : 'translate-x-full xl:hidden'
       }`}>
-        {/* Chat Header */}
         <div className="h-16 border-b border-slate-100 flex items-center px-5 bg-white shrink-0 justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="relative shrink-0">
@@ -932,19 +974,17 @@ export default function App() {
           </button>
         </div>
 
-        {/* Chat Messages */}
+        {}
         <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-6 scroll-smooth bg-slate-50/50">
           {messages.map((msg, idx) => (
             <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               
-              {/* Avatar Model */}
               {msg.role !== 'user' && (
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-1 shadow-sm ${msg.role === 'error' ? 'bg-red-100 text-red-600' : 'bg-teal-600 text-white'}`}>
                   {msg.role === 'error' ? <AlertCircle size={16} /> : <Bot size={16} />}
                 </div>
               )}
 
-              {/* Message Bubble */}
               <div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm ${
                 msg.role === 'user' 
                   ? 'bg-teal-600 text-white rounded-tr-xs' 
@@ -959,18 +999,17 @@ export default function App() {
                         return <li key={i} className="ml-4 list-disc marker:text-teal-500 text-left">{parseInlineMarkdown(line.substring(2))}</li>;
                       }
                       return (
-                        <p key={i} className="min-h-[1rem] text-left">
+                        <p key={i} className="min-h-[1rem] text-left font-normal">
                           {parseInlineMarkdown(line)}
                         </p>
                       );
                     })}
                   </div>
                 ) : (
-                  <p className="text-sm whitespace-pre-wrap text-left">{msg.text}</p>
+                  <p className="text-sm whitespace-pre-wrap text-left font-normal">{msg.text}</p>
                 )}
               </div>
 
-              {/* Avatar User */}
               {msg.role === 'user' && (
                 <div className="w-8 h-8 rounded-lg bg-slate-200 text-slate-600 flex items-center justify-center shrink-0 mt-1 shadow-sm">
                   <User size={16} />
@@ -980,9 +1019,8 @@ export default function App() {
             </div>
           ))}
 
-          {/* Loading Indicator */}
           {isLoading && (
-            <div className="flex gap-3 justify-start">
+            <div className="flex gap-3 justify-start animate-pulse">
               <div className="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0 mt-1 shadow-sm">
                 <Bot size={16} />
               </div>
@@ -995,7 +1033,7 @@ export default function App() {
           <div ref={chatEndRef} />
         </div>
 
-        {/* Chat Input */}
+        {}
         <div className="p-4 bg-white border-t border-slate-100 shrink-0">
           <form onSubmit={handleSendMessage} className="relative flex items-center">
             <input
@@ -1004,7 +1042,7 @@ export default function App() {
               onChange={(e) => setInputValue(e.target.value)}
               placeholder={documents.length > 0 ? "Ask about your medical reports..." : "Upload a report to ask questions..."}
               disabled={isLoading}
-              className="w-full bg-slate-50 border border-slate-200 rounded-full pl-5 pr-12 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-all disabled:opacity-60 disabled:cursor-not-allowed text-slate-700 placeholder:text-slate-400"
+              className="w-full bg-slate-50 border border-slate-200 rounded-full pl-5 pr-12 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-all disabled:opacity-60 disabled:cursor-not-allowed text-slate-700 placeholder:text-slate-400 font-normal"
             />
             <button
               type="submit"
